@@ -1,0 +1,103 @@
+import { ChatGoogle } from "@langchain/google";
+import { MemorySaver, MessagesAnnotation, StateGraph } from "@langchain/langgraph";
+import dotenv from "dotenv";
+import { initDB } from "./db.ts";
+import { initTools } from "./tools.ts";
+import { ToolNode } from "@langchain/langgraph/prebuilt";
+import { AIMessage } from "langchain";
+
+dotenv.config();
+
+/** initialise database */
+const database = initDB("expenses.db");
+
+const tools = initTools(database);
+
+const llm = new ChatGoogle({
+  apiKey: process.env.GOOGLE_API_KEY,
+  model: "gemini-3.5-flash-lite",
+});
+
+/**
+ * Tool Node
+ * @param state 
+ * @returns 
+ */
+
+const toolNode = new ToolNode(tools);
+
+/**
+ * call model node
+ * @param state 
+ * @returns 
+ */
+async function callModel(state: typeof MessagesAnnotation.State) {
+    const  llmWithTools = llm.bindTools(tools);
+    const response = await llmWithTools.invoke([
+        {
+            role: "system",
+            content: `You are a helpful expense tracking asssistant. Current datetime is ${new Date().toISOString()}.
+            call add_expense tool to add the expense to database
+            call fet_expense tool to add the expense to database
+            call generate_expense_chart tool when user needs to visualize expenses`
+        },
+        ...state.messages
+    ]); // not res
+    return { messages: [response]};
+}
+
+
+/**
+ * Continue edge
+ */
+function shouldContinue(state: typeof MessagesAnnotation.State) {
+    const messages = state.messages;
+    const lastMessage = messages.at(-1) as AIMessage;
+    
+    if(lastMessage.tool_calls?.length) {
+        return 'tools'
+    }
+    return '__end__';
+}
+
+function shouldCallModel(state: typeof MessagesAnnotation.State) {
+
+    return 'callModel';
+}
+/**
+ * Graph
+ */
+
+const graph = new StateGraph(MessagesAnnotation)
+    .addNode('callModel', callModel)
+    .addNode('tools', toolNode)
+    .addEdge('__start__', 'callModel')
+    .addConditionalEdges('callModel', shouldContinue, {
+        __end__ : '__end__',
+        tools: 'tools'
+    })
+    .addConditionalEdges('tools', shouldCallModel, {
+        callModel: 'callModel'
+    });
+
+
+    const agent = graph.compile({
+        checkpointer: new MemorySaver()
+    });
+
+
+    async function main() {
+        const response = await agent.invoke({
+            messages : [
+                {
+                    role: 'user',
+                    content: 'can you visualize how much I have spend this year group by week'
+                }
+            ]
+        }, 
+        {configurable: {thread_id: '1'}}
+    );
+        console.log(JSON.stringify(response, null, 2));
+    }
+
+    main();
