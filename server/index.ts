@@ -1,10 +1,11 @@
 import { ChatGoogle } from "@langchain/google";
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { MemorySaver, MessagesAnnotation, StateGraph } from "@langchain/langgraph";
 import dotenv from "dotenv";
 import { initDB } from "./db.ts";
-import { initTools } from "./tools.ts";
+import { initTools } from "./tools.ts"
 import { ToolNode } from "@langchain/langgraph/prebuilt";
-import { AIMessage } from "langchain";
+import { AIMessage, ToolMessage } from "langchain";
 
 dotenv.config();
 
@@ -61,7 +62,13 @@ function shouldContinue(state: typeof MessagesAnnotation.State) {
 }
 
 function shouldCallModel(state: typeof MessagesAnnotation.State) {
+    const messages = state.messages;
+    const lastMessage = messages.at(-1) as ToolMessage;
 
+    const message = JSON.parse(lastMessage.content as string);
+    if (message.type == 'chart') {
+        return '__end__';
+    }   
     return 'callModel';
 }
 /**
@@ -77,7 +84,8 @@ const graph = new StateGraph(MessagesAnnotation)
         tools: 'tools'
     })
     .addConditionalEdges('tools', shouldCallModel, {
-        callModel: 'callModel'
+        callModel: 'callModel',
+        __end__: '__end__'
     });
 
 
@@ -87,16 +95,26 @@ const graph = new StateGraph(MessagesAnnotation)
 
 
     async function main() {
-        const response = await agent.invoke({
+        const response = await agent.stream({
             messages : [
                 {
                     role: 'user',
-                    content: 'can you visualize how much I have spend this year group by week'
+                    content: 'Hi'
                 }
             ]
         }, 
-        {configurable: {thread_id: '1'}}
+        {
+            configurable: {thread_id: '1'},
+            streamMode: 'value'
+        }
     );
+        for await(const chunk of response) {
+            const [step, content] = Object.entries(chunk)[0];
+            console.log(`chunk: `, JSON.stringify(chunk, null, 2));
+            // console.log(
+            //     `content: ${JSON.stringify(content, null, 2)}`
+            // )
+        }
         console.log(JSON.stringify(response, null, 2));
     }
 

@@ -7,7 +7,7 @@ export function initTools(database: DatabaseSync) {
      * Add expense tool
      */
     const addExpense = tool(
-        ({ title, amount }) => {
+        ({ title, amount }  : { title: string, amount: number }) => {
             console.log({ title, amount });
             const date = new Date().toISOString().split('T')[0];
             const stmt = database.prepare(
@@ -32,7 +32,7 @@ export function initTools(database: DatabaseSync) {
      */
 
     const getExpenses = tool(
-        ({ from, to }) => {
+        ({ from, to }: { from: string, to: string }) => {
             console.log({ from, to });
             const stmt = database.prepare(
                 `SELECT * from expenses where date between ? AND ?`,
@@ -46,7 +46,7 @@ export function initTools(database: DatabaseSync) {
             description: `Get the expenses from database for the given range`,
             schema: z.object({
                 from: z.string().describe('start date in YYYY-MM-DD format'),
-                to: z.number().describe('end date in YYYY-MM-DD format'),
+                to: z.string().describe('end date in YYYY-MM-DD format'),
             })
         }
     )
@@ -56,15 +56,38 @@ export function initTools(database: DatabaseSync) {
      */
 
     const generateChart = tool(
-        ({ from, to, groupBy }) => {
+        ({ from , to, groupBy }: { from: string, to: string, groupBy: string }) => {
             
             // forma yyyy-mm-dd ->month -> 2026-11-26 -> 2026-11
-            const query =  `SELECT strftime('%Y-%m', date) as period, SUM(amount) as total from expenses where date between ? AND ? GROUP BY period
+            let groupByQuery: string;
+
+            switch (groupBy) {
+                case 'month' :
+                    groupByQuery = `strftime('%Y-%m', date)`;
+                    break;
+                
+                case 'week':
+                    groupByQuery = `strftime('%Y-W%W', date)`; //2026-W26
+                    break;
+                case 'date':
+                    groupByQuery = 'date';
+                    break;
+                default:
+                    groupByQuery = `strftime('%Y-%m', date)`;
+            }
+
+            const query =  `SELECT ${groupByQuery} as period, SUM(amount) as total from expenses where date between ? AND ? GROUP BY period
             ORDER BY period`;
             const stmt = database.prepare(query);
             const rows = stmt.all(from, to);
             console.log('rows', rows);
-            return JSON.stringify( rows)
+            const result = rows.map((row : any) => {
+                return {
+                    [groupBy]: row.period,
+                    amount: row.total
+                }
+            })
+            return JSON.stringify( {type: 'chart', data: result, labelKey: groupBy });
         },
         {
             name: 'generate_expense_chart',
