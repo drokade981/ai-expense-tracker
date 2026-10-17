@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "ts-node server.ts",
+    "start": "node server.ts"
   },
   "keywords": [],
   "author": "Devendra Rokade",
@@ -13,11 +14,14 @@
   "dependencies": {
     "@langchain/google": "^0.2.10",
     "@langchain/langgraph": "^1.4.21",
+    "cors": "^2.8.6",
     "dotenv": "^18.0.6",
     "langchain": "^1.5.16",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5"
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "express": "^5.3.0"
   }
 }

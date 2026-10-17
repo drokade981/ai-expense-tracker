@@ -89,33 +89,33 @@ const graph = new StateGraph(MessagesAnnotation)
     });
 
 
-    const agent = graph.compile({
+    export const agent = graph.compile({
         checkpointer: new MemorySaver()
     });
 
 
-    async function main() {
-        const response = await agent.stream({
-            messages : [
-                {
-                    role: 'user',
-                    content: 'Hi'
-                }
-            ]
-        }, 
-        {
-            configurable: {thread_id: '1'},
-            streamMode: 'value'
-        }
-    );
-        for await(const chunk of response) {
-            const [step, content] = Object.entries(chunk)[0];
-            console.log(`chunk: `, JSON.stringify(chunk, null, 2));
-            // console.log(
-            //     `content: ${JSON.stringify(content, null, 2)}`
-            // )
-        }
-        console.log(JSON.stringify(response, null, 2));
-    }
+    // async function main() {
+    //     const response = await agent.stream({
+    //         messages : [
+    //             {
+    //                 role: 'user',
+    //                 content: 'Hi'
+    //             }
+    //         ]
+    //     }, 
+    //     {
+    //         configurable: {thread_id: '1'},
+    //         streamMode: ['updates', 'custom']
+    //     }
+    // );
+    //     for await(const chunk of response) {
+    //         const [step, content] = Object.entries(chunk)[0];
+    //         console.log(`chunk: `, JSON.stringify(chunk, null, 2));
+    //         // console.log(
+    //         //     `content: ${JSON.stringify(content, null, 2)}`
+    //         // )
+    //     }
+    //     console.log(JSON.stringify(response, null, 2));
+    // }
 
-    main();
+    // main();
