@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { agent } from './index.ts';
+import type { StreamMessage } from './types.ts';
 
 const app = express();
 
@@ -33,7 +34,30 @@ app.post('/chat', async (req, res) => {
 
     for await(const [eventType, chunk] of response){
         console.log('chunk', JSON.stringify(chunk[0].content, null,2));
-        let message = { type: 'ai', payload: chunk[0].content};
+       
+
+        const messageType = chunk[0].type;
+        let message: StreamMessage = {} as StreamMessage;
+
+        switch (messageType) {
+            case 'ai':
+                message = {
+                    type: 'ai',
+                    payload: { text: chunk[0].content as string}
+                }
+                break;
+            case 'toolCall':
+                break;
+            case 'tool':
+                break;
+            default:
+                break;
+        }
+
+        message = {
+            type: 'ai',
+            payload: { text: chunk[0].content}
+        }
         res.write(`event: ${eventType} \n`);
         res.write(`data: ${JSON.stringify(message)}\n\n`);
     }    
