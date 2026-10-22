@@ -33,25 +33,33 @@ app.post('/chat', async (req, res) => {
     });
 
     for await(const [eventType, chunk] of response){
+        console.log('eventType', eventType);
         console.log('chunk', JSON.stringify(chunk[0].content, null,2));
-       
 
         const messageType = chunk[0].type;
         let message: StreamMessage = {} as StreamMessage;
-
-        switch (messageType) {
-            case 'ai':
+        
+        if(eventType === 'custom') {
+            console.log('chunk', JSON.stringify(chunk))
+            message = chunk;
+        } else if (eventType === 'messages') {
+            if(chunk[0].content === '') continue;
+            message= {
+                type: 'ai',
+                payload: { text: chunk[0].content as string }
+            }
+            if(messageType === 'ai') {
                 message = {
                     type: 'ai',
                     payload: { text: chunk[0].content as string}
                 }
-                break;
-            case 'toolCall':
-                break;
-            case 'tool':
-                break;
-            default:
-                break;
+            } else if (messageType === 'tool') {
+                message = {
+                    type: 'tool',
+                    payload: { name: chunk[0].name!, result: JSON.parse(chunk[0].content!) }
+                }
+            } 
+            
         }
 
         message = {

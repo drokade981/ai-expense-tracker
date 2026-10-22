@@ -6,6 +6,7 @@ import { initDB } from "./db.ts";
 import { initTools } from "./tools.ts"
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { AIMessage, ToolMessage } from "langchain";
+import type { StreamMessage } from "./types.js";
 
 dotenv.config();
 
@@ -51,11 +52,21 @@ async function callModel(state: typeof MessagesAnnotation.State) {
 /**
  * Continue edge
  */
-function shouldContinue(state: typeof MessagesAnnotation.State) {
+function shouldContinue(state: typeof MessagesAnnotation.State, config: LangGraphRunnableConfig) {
     const messages = state.messages;
     const lastMessage = messages.at(-1) as AIMessage;
     
     if(lastMessage.tool_calls?.length) {
+
+        // send custom event
+        const customMessage: StreamMessage = {
+            type: 'toolCall:start',
+            payload: {
+                name: lastMessage.tool_calls[0].name,
+                args: lastMessage.tool_calls[0].args
+            }   
+        };
+        config.writer!(customMessage);
         return 'tools'
     }
     return '__end__';
