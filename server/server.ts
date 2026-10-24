@@ -13,12 +13,34 @@ app.get('/', (req, res) => {
     res.send('Server is running');
 });
 
+function extractText(content: unknown): string {
+    if (typeof content === 'string') {
+        return content;
+    }
+    if (Array.isArray(content)) {
+        return content
+            .map((item) => {
+                if (typeof item === 'string') return item;
+                if (item && typeof item === 'object') {
+                    if ('text' in item && typeof (item as any).text === 'string') {
+                        return (item as any).text;
+                    }
+                }
+                return '';
+            })
+            .join('');
+    }
+    return '';
+}
+
 app.post('/chat', async (req, res) => {
     res.writeHead(200, {
-        'content-type': 'text/event-stream',
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
     });
 
-    const {query} = req.body;
+    const { query } = req.body;
 
     const response = await agent.stream({
         messages: [
@@ -27,49 +49,68 @@ app.post('/chat', async (req, res) => {
                 content: query
             }
         ]
-    },{
-        streamMode: ['messages'],
-        configurable: { thread_id: '1'}
+    }, {
+        streamMode: ['messages', 'custom'],
+        configurable: { thread_id: '1' }
     });
 
-    for await(const [eventType, chunk] of response){
+    for await (const [eventType, chunk] of response) {
         console.log('eventType', eventType);
-        console.log('chunk', JSON.stringify(chunk[0].content, null,2));
 
-        const messageType = chunk[0].type;
-        let message: StreamMessage = {} as StreamMessage;
-        
-        if(eventType === 'custom') {
-            console.log('chunk', JSON.stringify(chunk))
-            message = chunk;
-        } else if (eventType === 'messages') {
-            if(chunk[0].content === '') continue;
-            message= {
-                type: 'ai',
-                payload: { text: chunk[0].content as string }
+        if (eventType === 'custom') {
+            console.log('custom chunk', JSON.stringify(chunk));
+            const customMessage = chunk as StreamMessage;
+            if (!customMessage.id) {
+                customMessage.id = Date.now().toString();
             }
-            if(messageType === 'ai') {
-                message = {
+            res.write(`event: ${eventType}\n`);
+            res.write(`data: ${JSON.stringify(customMessage)}\n\n`);
+            continue;
+        }
+
+        if (eventType === 'messages') {
+            const [messageChunk] = chunk;
+            if (!messageChunk) continue;
+
+            const messageType = messageChunk.getType ? messageChunk.getType() : messageChunk.type;
+
+            if (messageType === 'ai') {
+                const text = extractText(messageChunk.content);
+                // Skip if there's no text (e.g. tool call or thought part)
+                if (!text) continue;
+
+                const message: StreamMessage = {
+                    id: messageChunk.id || 'ai-response',
                     type: 'ai',
-                    payload: { text: chunk[0].content as string}
-                }
+                    payload: { text }
+                };
+
+                res.write(`event: ${eventType}\n`);
+                res.write(`data: ${JSON.stringify(message)}\n\n`);
             } else if (messageType === 'tool') {
-                message = {
-                    type: 'tool',
-                    payload: { name: chunk[0].name!, result: JSON.parse(chunk[0].content!) }
+                let parsedResult = messageChunk.content;
+                if (typeof messageChunk.content === 'string') {
+                    try {
+                        parsedResult = JSON.parse(messageChunk.content);
+                    } catch {
+                        parsedResult = messageChunk.content;
+                    }
                 }
-            } 
-            
-        }
 
-        message = {
-            type: 'ai',
-            payload: { text: chunk[0].content}
-        }
-        res.write(`event: ${eventType} \n`);
-        res.write(`data: ${JSON.stringify(message)}\n\n`);
-    }    
+                const message: StreamMessage = {
+                    id: messageChunk.id || Date.now().toString(),
+                    type: 'tool',
+                    payload: {
+                        name: messageChunk.name || 'tool',
+                        result: parsedResult
+                    }
+                };
 
+                res.write(`event: ${eventType}\n`);
+                res.write(`data: ${JSON.stringify(message)}\n\n`);
+            }
+        }
+    }
 
     res.end();
 });

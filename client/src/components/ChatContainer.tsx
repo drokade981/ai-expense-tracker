@@ -1,16 +1,18 @@
 import { ChatInput } from './ChatInput.tsx';
 import { ChatMessage } from './ChatMessage.tsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import type { StreamMessage } from '../types.ts';
 
 
 export function ChatContainer() {
+    const messageEndRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState<StreamMessage[]>([]);
 
     useEffect(() => {
+        messageEndRef.current?.scrollIntoView({ behavior: 'smooth' })
         console.log("message");
-    }, [])
+    }, [messages])
     async function submitQuery(userInput: string) {
 
         setMessages((prevMessages) => {
@@ -194,6 +196,7 @@ export function ChatContainer() {
                                     </div>
                                 ))
                             }
+                            <div ref={messageEndRef}></div>
                         </div>
                     )}
                 </div>

@@ -94,7 +94,7 @@ export function initTools(database: DatabaseSync) {
             description: `Generate expenses chart by quering the database and grouping expenses by month, week or date`,
             schema: z.object({
                 from: z.string().describe('start date in YYYY-MM-DD format'),
-                to: z.number().describe('end date in YYYY-MM-DD format'),
+                to: z.string().describe('end date in YYYY-MM-DD format'),
                 groupBy: z.enum(['month', 'week', 'date']).describe('How to group the data by month, week or date')
             })
         }

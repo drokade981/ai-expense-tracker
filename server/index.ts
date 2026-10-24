@@ -40,11 +40,11 @@ async function callModel(state: typeof MessagesAnnotation.State) {
             role: "system",
             content: `You are a helpful expense tracking asssistant. Current datetime is ${new Date().toISOString()}.
             call add_expense tool to add the expense to database
-            call fet_expense tool to add the expense to database
+            call get_expenses tool to query expenses from database
             call generate_expense_chart tool when user needs to visualize expenses`
         },
         ...state.messages
-    ]); // not res
+    ]);
     return { messages: [response]};
 }
 
@@ -60,6 +60,7 @@ function shouldContinue(state: typeof MessagesAnnotation.State, config: LangGrap
 
         // send custom event
         const customMessage: StreamMessage = {
+            id: Date.now().toString(),
             type: 'toolCall:start',
             payload: {
                 name: lastMessage.tool_calls[0].name,
@@ -76,10 +77,16 @@ function shouldCallModel(state: typeof MessagesAnnotation.State) {
     const messages = state.messages;
     const lastMessage = messages.at(-1) as ToolMessage;
 
-    const message = JSON.parse(lastMessage.content as string);
-    if (message.type == 'chart') {
-        return '__end__';
-    }   
+    try {
+        const message = typeof lastMessage.content === 'string'
+            ? JSON.parse(lastMessage.content)
+            : lastMessage.content;
+        if (message && message.type === 'chart') {
+            return '__end__';
+        }
+    } catch {
+        // Not a JSON chart
+    }
     return 'callModel';
 }
 /**
