@@ -78,9 +78,7 @@ function shouldCallModel(state: typeof MessagesAnnotation.State) {
     const lastMessage = messages.at(-1) as ToolMessage;
 
     try {
-        const message = typeof lastMessage.content === 'string'
-            ? JSON.parse(lastMessage.content)
-            : lastMessage.content;
+        const message = JSON.parse(lastMessage.content as string);
         if (message && message.type === 'chart') {
             return '__end__';
         }
